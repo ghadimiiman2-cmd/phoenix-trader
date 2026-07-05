@@ -1,56 +1,81 @@
-print("Phoenix Trader is running...")
 import requests
 
-def get_price(symbol="BTCUSDT"):
+import pandas as pd
 
-    url = "https://api.binance.com/api/v3/ticker/price"
+BINANCE = "https://api.binance.com/api/v3"
 
-    r = requests.get(url, params={"symbol": symbol})
+def get_klines(symbol="BTCUSDT", interval="15m", limit=200):
 
-    return float(r.json()["price"])
+    url = f"{BINANCE}/klines"
 
-price = get_price()
+    params = {"symbol": symbol, "interval": interval, "limit": limit}
 
-print("BTC Price:", import requests
+    data = requests.get(url, params=params).json()
 
-def get_price(symbol="BTCUSDT"):
+    df = pd.DataFrame(data, columns=[
 
-    url = "https://api.binance.com/api/v3/ticker/price"
+        "time","open","high","low","close","volume",
 
-    r = requests.get(url, params={"symbol": symbol})
+        "c1","c2","c3","c4","c5","c6"
 
-    return float(r.json()["price"])
+    ])
 
-def get_rsi(price):
+    df["close"] = df["close"].astype(float)
 
-    return 25 if price % 5 == 0 else 55
+    return df
 
-def get_ema_trend(price):
+def rsi(series, period=14):
 
-    return "UP" if price % 2 == 0 else "DOWN"
+    delta = series.diff()
 
-price = get_price()
+    gain = delta.clip(lower=0).rolling(period).mean()
 
-rsi = get_rsi(price)
+    loss = -delta.clip(upper=0).rolling(period).mean()
 
-trend = get_ema_trend(price)
+    rs = gain / loss
 
-signal = "NONE"
+    return 100 - (100 / (1 + rs))
 
-if rsi < 30 and trend == "UP":
+def ema(series, period):
 
-    signal = "BUY"
+    return series.ewm(span=period).mean()
 
-elif rsi > 70 and trend == "DOWN":
+def analyze(df):
 
-    signal = "SELL"
+    df["rsi"] = rsi(df["close"])
 
-print("Phoenix Trader Running...")
+    df["ema50"] = ema(df["close"], 50)
 
-print("Price:", price)
+    df["ema200"] = ema(df["close"], 200)
 
-print("RSI:", rsi)
+    last = df.iloc[-1]
 
-print("Trend:", trend)
+    trend_up = last["ema50"] > last["ema200"]
 
-print("Signal:", signal)
+    trend_down = last["ema50"] < last["ema200"]
+
+    rsi_val = last["rsi"]
+
+    signal = "NONE"
+
+    if rsi_val < 30 and trend_up:
+
+        signal = "BUY"
+
+    elif rsi_val > 70 and trend_down:
+
+        signal = "SELL"
+
+    print("Phoenix Trader PRO Running...")
+
+    print("RSI:", round(rsi_val, 2))
+
+    print("Trend UP:", trend_up)
+
+    print("Trend DOWN:", trend_down)
+
+    print("SIGNAL:", signal)
+
+df = get_klines("BTCUSDT", "15m")
+
+analyze(df)
